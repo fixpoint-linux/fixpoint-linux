@@ -297,6 +297,65 @@ org's thesis, and it stays in your head because the package set stays small.
   delivered.**
 - **M4 — rootfs assembly + boot.** `config.dhall` → rootfs → a bootable image;
   services are the org's APE binaries.
+- **M5 — the system timeline & rollback.** `fxstore timeline` / `fxstore rollback`
+  on top of `datalog-dafsa`'s native snapshot time-travel (see §10).
+
+---
+
+## 10. System timeline & rollback (via `datalog-dafsa` time travel)
+
+`datalog-dafsa` ships real time travel, so the timeline needs **no new engine
+work** — `fxstore` just surfaces it. The relevant API, all present today:
+
+- `dl_publish_snapshot()` — atomically saves the interner + all relations to a
+  versioned snapshot dir and flips the `snapshots/CURRENT` pointer; reads then go
+  through mmap.
+- `dl_snapshot_versions()` — enumerate every published version in ascending order.
+- `dl_query_version()` / `dl_query_bound_version()` — **as-of queries** that
+  bypass the live path and never mutate `snap_version`: non-destructive time travel.
+- `dl_set_snapshot_retain(n)` — prune all but the `n` most-recent versions.
+- `dl_cas_revision()` + `dl_txn_*` — per-entity compare-and-swap + atomic batches
+  for conflict-safe concurrent edits.
+
+On-disk layout: `<store>/snapshots/<version>/manifest.txt` + per-relation mmap
+views, with `<store>/snapshots/CURRENT`.
+
+### 10.1 The timeline
+
+The `/fx/store` is **one** `datalog-dafsa` DB, so every relation — `package`,
+`deps`, `closure`, the installed set, `config` — is captured by a snapshot. **One
+`dl_publish_snapshot()` per successful activation = one complete system state.**
+`CURRENT` always points at the live system; the timeline is `dl_snapshot_versions()`.
+
+### 10.2 Rollback semantics: **roll-forward** (decided)
+
+To roll back to version *v*:
+
+- **Roll-forward (default):** re-publish version *v*'s state as a *new* version.
+  `CURRENT` stays monotonic and append-only — the timeline is a pure ledger, the
+  rollback itself is recorded as history, and it is undoable (roll forward again).
+- **True revert (escape hatch):** point `CURRENT` directly at version *v*
+  (`fx rollback --hard <v>`). Breaks monotonicity; only for explicit recovery.
+
+### 10.3 What falls out
+
+- **Generation GC = `dl_set_snapshot_retain(N)`.** Keep the last N bootable
+  generations, prune older — one call.
+- **Boot rollback.** On boot, init reads the timeline, inspects a prior state via
+  as-of query, and if the latest activation failed to come up, rolls forward to the
+  last good version. Snapshot reads are mmap + bypass the live path, so inspecting
+  "the system two weeks ago" is just an as-of query.
+- **Conflict-safe concurrent edits = CAS.** Two agents both read `rev=5` of the
+  config entity, both edit; only one `dl_cas_revision(db,"config",5,6)` wins, the
+  loser gets `DL_E_CONFLICT` and must rebase — the "my plan is based on a stale
+  system" detection a multi-agent-built system needs.
+- **The closure is part of the snapshot.** Because `closure` is a relation, a
+  snapshot captures *which* packages were live and *why*. GC deletes only paths
+  unreachable from the **current `CURRENT` snapshot's** closure; historical
+  versions keep their artifacts alive until pruned.
+
+This strengthens the thesis: **a system that can inspect and restore any point in
+its own history using only the primitives the storage engine already provides.**
 
 ---
 
