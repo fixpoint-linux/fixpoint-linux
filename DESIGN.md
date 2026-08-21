@@ -1,11 +1,18 @@
 # fixpoint-linux — a Dhall-specified, self-hosting Linux system
 
-> **Status:** design / proposal (2026-08)
+> **Status:** partial implementation — **M0/M1/M2 (fxstore) implemented** (2026-08)
 > **Thesis:** the whole system — its package derivations, the build graph, the
 > content-addressed store, and the running configuration — is specified in
 > **Dhall**, with **Datalog + DAFSA** as the computation and storage engine.
 > It is *like Nix in its model* (pure derivations, a content-addressed store,
 > hermetic builds) **without the Nix language**.
+>
+> **Implemented:** [`fxstore`](https://github.com/fixpoint-linux/fxstore) — the
+> content-addressed build store (M0+M1+M2) is complete: Dhall package set →
+> `datalog-dafsa` closure fixed point → content-addressed `/fx/store/<hash>-<name>`
+> paths → typed-recipe build (bwrap-sandboxed `Shell`/`Run`) → metadata-last txn →
+> GC. Deep-reviewed (blocker + 2 high defects found and fixed). M3/M4/M5 are the
+> remaining milestones.
 
 This document proposes the concrete architecture. It is a design writeup only —
 no source is written yet.
@@ -286,15 +293,18 @@ org's thesis, and it stays in your head because the package set stays small.
 - **M0 — store-path closure (the proof of the fixed point).** A tiny C tool
   (`fxpath`) that reads a Dhall package set, loads `deps` into datalog-dafsa,
   computes the closure, and prints content-addressed paths. *Proves the core idea
-  end-to-end with almost no new surface.*
+  end-to-end with almost no new surface.* ✅ **Done** (folded into `fxstore`).
 - **M1 — `fxstore`.** The content-addressed store on disk: write artifacts under
   `/fx/store/<hash>-<name>`, DAFSA metadata, transaction/CAS, `fxstore gc <root>`.
+  ✅ **Done** (standalone repo [`fixpoint-linux/fxstore`](https://github.com/fixpoint-linux/fxstore)).
 - **M2 — dhake integration.** Teach dhake to resolve `deps` to store paths and
   build into the store, in a bwrap sandbox, with mtime incrementality over store
-  inputs.
+  inputs. ✅ **Done** — `fxstore` executes the same typed `List Action` recipes
+  (`Shell`/`Run` bwrap-sandboxed) with mtime incrementality over store-path inputs.
+  (M2 folded into fxstore's `build` rather than re-using dhake's binary.)
 - **M3 — the self-hosting system.** Dhall-spec all 7 org packages as derivations;
   the system rebuilds itself from `system.dhall`. **This is the org's thesis
-  delivered.**
+  delivered.** ⏳ Next.
 - **M4 — rootfs assembly + boot.** `config.dhall` → rootfs → a bootable image;
   services are the org's APE binaries.
 - **M5 — the system timeline & rollback.** `fxstore timeline` / `fxstore rollback`
