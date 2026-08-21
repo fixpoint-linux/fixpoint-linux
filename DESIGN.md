@@ -1,6 +1,6 @@
 # fixpoint-linux — a Dhall-specified, self-hosting Linux system
 
-> **Status:** partial implementation — **M0/M1/M2 (fxstore) implemented** (2026-08)
+> **Status:** partial implementation — **M0/M1/M2/M3 (fxstore) implemented** (2026-08)
 > **Thesis:** the whole system — its package derivations, the build graph, the
 > content-addressed store, and the running configuration — is specified in
 > **Dhall**, with **Datalog + DAFSA** as the computation and storage engine.
@@ -10,9 +10,13 @@
 > **Implemented:** [`fxstore`](https://github.com/fixpoint-linux/fxstore) — the
 > content-addressed build store (M0+M1+M2) is complete: Dhall package set →
 > `datalog-dafsa` closure fixed point → content-addressed `/fx/store/<hash>-<name>`
-> paths → typed-recipe build (bwrap-sandboxed `Shell`/`Run`) → metadata-last txn →
-> GC. Deep-reviewed (blocker + 2 high defects found and fixed). M3/M4/M5 are the
-> remaining milestones.
+> paths → typed-recipe build (bwrap + palisade-stage3-sandboxed `Shell`/`Run`,
+> hermetic: seccomp+Landlock, no network) → metadata-last txn → GC. Deep-reviewed
+> (blocker + 2 high defects found and fixed). **M3 (the self-hosting system) is
+> implemented**: `fxstore/m3/package-set.dhall` specs 6 org packages (dhall-c,
+> dhake, datalog-dafsa, dafsa, compendium, visage) as derivations; the full
+> closure builds end-to-end through the sandbox into content-addressed store
+> paths. shen-meta/shen deferred. **M4/M5 are the remaining milestones.**
 
 This document proposes the concrete architecture. It is a design writeup only —
 no source is written yet.
@@ -302,9 +306,15 @@ org's thesis, and it stays in your head because the package set stays small.
   inputs. ✅ **Done** — `fxstore` executes the same typed `List Action` recipes
   (`Shell`/`Run` bwrap-sandboxed) with mtime incrementality over store-path inputs.
   (M2 folded into fxstore's `build` rather than re-using dhake's binary.)
-- **M3 — the self-hosting system.** Dhall-spec all 7 org packages as derivations;
-  the system rebuilds itself from `system.dhall`. **This is the org's thesis
-  delivered.** ⏳ Next.
+- **M3 — the self-hosting system.** Dhall-spec the org packages as derivations;
+  the system rebuilds itself from a single package set. **This is the org's thesis
+  delivered.** ✅ **Done** (2026-08) — `fxstore/m3/package-set.dhall` specs 6 org
+  packages (dhall-c, dhake, datalog-dafsa, dafsa, compendium, visage) as
+  fxstore derivations; `cd fxstore/m3 && fxstore build --store /fx/store` builds
+  the full closure through the bwrap + palisade-stage3 sandbox into
+  content-addressed store paths. shen-meta/shen deferred. (Known caveat: whole-tree
+  src means the content hash covers `.git` + build artifacts — reproducible for a
+  fixed checkout but slow; cleaned-src/exclusion is a documented follow-up.)
 - **M4 — rootfs assembly + boot.** `config.dhall` → rootfs → a bootable image;
   services are the org's APE binaries.
 - **M5 — the system timeline & rollback.** `fxstore timeline` / `fxstore rollback`
