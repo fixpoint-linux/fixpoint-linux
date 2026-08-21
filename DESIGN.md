@@ -318,9 +318,10 @@ org's thesis, and it stays in your head because the package set stays small.
   caches and generated wasm are excluded), and a clean `<hash>-<name>-src`
   artifact is materialized into the store and used as the build input. A
   `tests/fxstore_repro.sh` proves two identical-content trees with differing
-  `.git` state produce the same store path. (Residual: whole-tree src still hashes
-  committed data/models as "source" — per-package excludes are a documented
-  M4 follow-up.)
+  `.git` state produce the same store path. **Per-package `excludes` (relative
+  subtree prefixes, e.g. `models`, `vendor/ggml`, `dist`) + mode-bits preservation
+  landed after M3** (`tests/fxstore_excludes.sh`), so a package can drop committed
+  data/models out of its clean hash+copy entirely.
 - **M4 — rootfs assembly + boot.** `config.dhall` → rootfs → a bootable image;
   services are the org's APE binaries.
 - **M5 — the system timeline & rollback.** `fxstore timeline` / `fxstore rollback`
