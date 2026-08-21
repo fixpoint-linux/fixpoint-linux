@@ -312,9 +312,15 @@ org's thesis, and it stays in your head because the package set stays small.
   packages (dhall-c, dhake, datalog-dafsa, dafsa, compendium, visage) as
   fxstore derivations; `cd fxstore/m3 && fxstore build --store /fx/store` builds
   the full closure through the bwrap + palisade-stage3 sandbox into
-  content-addressed store paths. shen-meta/shen deferred. (Known caveat: whole-tree
-  src means the content hash covers `.git` + build artifacts — reproducible for a
-  fixed checkout but slow; cleaned-src/exclusion is a documented follow-up.)
+  content-addressed store paths. shen-meta/shen deferred. Source content-identity
+  is **clean-copy-into-store**: the store-path hash is a pure function of source
+  content (git/checkout-state-independent — `.git`, committed build binaries,
+  caches and generated wasm are excluded), and a clean `<hash>-<name>-src`
+  artifact is materialized into the store and used as the build input. A
+  `tests/fxstore_repro.sh` proves two identical-content trees with differing
+  `.git` state produce the same store path. (Residual: whole-tree src still hashes
+  committed data/models as "source" — per-package excludes are a documented
+  M4 follow-up.)
 - **M4 — rootfs assembly + boot.** `config.dhall` → rootfs → a bootable image;
   services are the org's APE binaries.
 - **M5 — the system timeline & rollback.** `fxstore timeline` / `fxstore rollback`
