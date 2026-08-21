@@ -16,7 +16,7 @@
 > implemented**: `fxstore/m3/package-set.dhall` specs 6 org packages (dhall-c,
 > dhake, datalog-dafsa, dafsa, compendium, visage) as derivations; the full
 > closure builds end-to-end through the sandbox into content-addressed store
-> paths. shen-meta/shen deferred. **M4/M5 are the remaining milestones.**
+> paths. shen-meta/shen deferred. **M4 is the remaining milestone (M5 done).**
 
 This document proposes the concrete architecture. It is a design writeup only —
 no source is written yet.
@@ -325,7 +325,15 @@ org's thesis, and it stays in your head because the package set stays small.
 - **M4 — rootfs assembly + boot.** `config.dhall` → rootfs → a bootable image;
   services are the org's APE binaries.
 - **M5 — the system timeline & rollback.** `fxstore timeline` / `fxstore rollback`
-  on top of `datalog-dafsa`'s native snapshot time-travel (see §10).
+  on top of `datalog-dafsa`'s native snapshot time-travel (see §10). ✅ **Done**
+  (2026-08) — `fxstore timeline` (one line per published snapshot version with
+  roots/closure/store/srcstore counts), `fxstore rollback <v>` (roll-forward:
+  publish-first, one atomic txn swap of the store index + EDB relations, then
+  re-derive the IDB closure; +2 versions, undoable), `fxstore rollback --hard <v>`
+  (atomic CURRENT rewrite, recovery-only), and `fxstore gc [<root>] [--retain N]`
+  (generation GC prunes snapshot versions; refuses while CURRENT is stale post
+  `--hard`, guarding the dangling-CURRENT wedge). Deep-reviewed; tests/
+  fxstore_timeline.sh in `make test`.
 
 ---
 
